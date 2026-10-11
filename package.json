@@ -35,7 +35,8 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "pack": "node scripts/pack-plugin.mjs",
-    "test:host": "node tests/host.mjs"
+    "test:host": "node tests/host.mjs",
+    "test:market": "node tests/market.mjs"
   },
   "dependencies": {
     "@commerce/plugin-sdk": "file:vendor/commerce-plugin-sdk-1.2.0.tgz"

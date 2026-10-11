@@ -9,6 +9,11 @@ on:
         description: 'Successful Qingzuo v0.3.0 Release commerce desktop run ID'
         required: true
         type: string
+      validation:
+        description: 'Fixed-response contracts or signed public market installation'
+        type: choice
+        default: contracts
+        options: [contracts, market]
 permissions:
   contents: read
 defaults:
@@ -53,7 +58,7 @@ jobs:
           npm ci --ignore-scripts
           npm test
           npm run pack
-          npm run test:host
+          if [[ "${{ inputs.validation }}" == market ]]; then npm run test:market; else npm run test:host; fi
       - uses: actions/upload-artifact@v4
         with:
           name: Plugin-${{ runner.os }}
