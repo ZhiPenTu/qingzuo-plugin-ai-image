@@ -1,0 +1,89 @@
+name: Build and release AI image plugin
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      host_run_id:
+        description: 'Successful Qingzuo v0.3.0 Release commerce desktop run ID'
+        required: true
+        type: string
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      QINGZUO_HOST_RUN_ID: ${{ inputs.host_run_id || vars.QINGZUO_HOST_RUN_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify pinned host and SDK provenance
+        run: node scripts/verify-release-inputs.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          repository: ZhiPenTu/qingzuo-desktop
+          run-id: ${{ env.QINGZUO_HOST_RUN_ID }}
+          github-token: ${{ github.token }}
+          name: Commerce-${{ runner.os }}
+          path: host
+      - name: Prepare host outside the plugin source directory
+        run: |
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            ditto -x -k host/desktop/CommerceTools-0.3.0-mac-arm64.zip "$RUNNER_TEMP/qingzuo-runtime"
+            echo "QINGZUO_HOST_EXECUTABLE=$RUNNER_TEMP/qingzuo-runtime/Qingzuo.app/Contents/MacOS/Qingzuo" >> "$GITHUB_ENV"
+          else
+            node --input-type=module -e "import {cp} from 'node:fs/promises';import path from 'node:path';await cp('host/desktop/win-unpacked',path.join(process.env.RUNNER_TEMP,'qingzuo-runtime'),{recursive:true});"
+            echo "QINGZUO_HOST_EXECUTABLE=$RUNNER_TEMP/qingzuo-runtime/Qingzuo.exe" >> "$GITHUB_ENV"
+          fi
+      - name: Build and verify plugin with fixed responses
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run pack
+          npm run test:host
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Plugin-${{ runner.os }}
+          path: |
+            release/*.ecplugin
+            release/catalog-*.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AI-image-evidence-${{ runner.os }}
+          path: output/
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Plugin-*
+          path: release
+          merge-multiple: true
+      - name: Publish independently validated artifacts
+        run: |
+          node --input-type=module -e "import pkg from './package.json' with {type:'json'};if(process.env.GITHUB_REF_NAME!=='v'+pkg.version)throw new Error('Tag mismatch');"
+          gh release create "$GITHUB_REF_NAME" release/*.ecplugin release/catalog-*.json --verify-tag --title "AI 批图 $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md"

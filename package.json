@@ -1,0 +1,47 @@
+{
+  "name": "@commerce/plugin-ai-image",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "commerce": {
+    "manifestVersion": 1,
+    "id": "official.ai-image",
+    "title": "AI 批图",
+    "description": "复用 CLIProxyAPI 或官方 API 批量编辑图片，自定义提示词与 AI 助手",
+    "category": "图片处理",
+    "api": "^1.2.0",
+    "ui": "ui/index.html",
+    "settings": {
+      "title": "图像 API 配置",
+      "entry": "ui/settings.html"
+    },
+    "releaseNotes": "首版：复用 CLIProxyAPI 图片模型或官方 API，支持逐图提示词、方案确认、后台批处理、结果保存与 Harness AI 助手。需要轻作 0.3.0。",
+    "permissions": {
+      "files": true,
+      "ai": [
+        "assistant",
+        "image-edit"
+      ],
+      "credentials": [
+        "google-image",
+        "openai-image"
+      ],
+      "network": [
+        "https://generativelanguage.googleapis.com",
+        "https://api.openai.com"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "pack": "node scripts/pack-plugin.mjs",
+    "test:host": "node tests/host.mjs"
+  },
+  "dependencies": {
+    "@commerce/plugin-sdk": "file:vendor/commerce-plugin-sdk-1.2.0.tgz"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
+  },
+  "license": "MIT"
+}

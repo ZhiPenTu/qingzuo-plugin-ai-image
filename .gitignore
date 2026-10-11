@@ -1,0 +1,6 @@
+node_modules/
+release/
+ui/sdk.mjs
+output/
+.DS_Store
+*.ecplugin
