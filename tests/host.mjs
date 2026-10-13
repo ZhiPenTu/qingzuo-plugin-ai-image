@@ -155,7 +155,7 @@ try {
   proxyCatalog = imageCatalog; await host.plugin.locator('#refresh-models').click();
   await expect(host.plugin.locator('#proxy-state')).toContainText('3 个图片模型');
   await host.plugin.locator('#prepare').click();
-  await expect(host.plugin.locator('#batch-status')).toContainText('CLIProxyAPI');
+  await expect(host.plugin.locator('#batch-status')).toContainText('外部代理');
   await expect(host.plugin.locator('#execute')).toBeEnabled();
   const proxyBatch = (await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.batch.list')))[0];
   expect(proxyBatch.source).toBe('proxy'); expect(proxyCalls).toHaveLength(0);
@@ -164,7 +164,7 @@ try {
   await host.plugin.locator('#source').selectOption('official');
   await host.plugin.evaluate(() => { window.confirm = message => { window.lastConfirmation = message; return true; }; });
   await host.plugin.locator('#execute').click(); await expect.poll(async () => (await readdir(output)).length).toBe(9);
-  expect(await host.plugin.evaluate(() => window.lastConfirmation)).toContain('CLIProxyAPI');
+  expect(await host.plugin.evaluate(() => window.lastConfirmation)).toContain('外部代理');
   expect(proxyCalls).toHaveLength(4); expect(proxyCalls.every(call => call.endpoint.includes('gemini-3.1-flash-image-preview'))).toBe(true);
   expect((await host.page.evaluate(() => window.commerceDesktop.invoke('ai.status'))).model).toBe('fixture-plan');
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#pick').click(); await host.plugin.locator('#source').selectOption('proxy');
@@ -177,10 +177,10 @@ try {
   await expect.poll(async () => (await readdir(output)).length).toBe(11); expect(proxyCalls.at(-1).model).toBe('studio-edit');
   const evidence = process.env.QINGZUO_UI_EVIDENCE_DIR || 'output'; await mkdir(evidence, { recursive: true });
   await host.plugin.evaluate(() => window.scrollTo(0, 0));
-  await host.plugin.screenshot({ path: path.join(evidence, 'CLIProxyAPI批图界面.png') });
+  await host.plugin.screenshot({ path: path.join(evidence, '外部代理批图界面.png') });
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#provider').selectOption('openai');
   await host.plugin.evaluate(() => window.scrollTo(0, 0));
-  await host.plugin.screenshot({ path: path.join(evidence, 'CLIProxyAPI图片模型.png') });
+  await host.plugin.screenshot({ path: path.join(evidence, '外部代理图片模型.png') });
   expect(pageErrors).toEqual([]);
   console.log('独立安装包验收通过：官方与代理两类接口、代理别名、无需官方密钥、多图保存、模型刷新保留队列、批次来源冻结、确认隔离、默认助手不变；无付费请求。');
 } catch (error) { console.error('验收诊断', await host.plugin.locator('#notice').textContent(), await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.assistant.status')), await trusted('diagnostic')); throw error; }
