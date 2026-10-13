@@ -1,0 +1,42 @@
+# AGENTS.md
+
+本仓库是轻作独立 `official.ai-image` 插件，提供批量图像编辑、外部代理图片模型和宿主 AI 助手入口。它依赖轻作 0.3.0 / 插件 API 1.2；桌面底座和市场目录在其他仓库维护。
+
+## 项目边界
+
+- `ui/` 包含批次、配置和助手界面；`tests/` 包含状态、固定响应 host 和公开市场测试；`scripts/pack-plugin.mjs` 生成平台制品和目录片段；`scripts/verify-release-inputs.mjs` 校验固定底座与 SDK Release。
+- manifest 的权限必须保持最小：`files`、`ai: ['assistant', 'image-edit']`、声明的 Google/OpenAI origin 和隔离凭据。
+- SDK 1.2.0 tarball 随项目固定保存，并在发布时对照 `sdk-v1.2.0` Release 校验；不要改用浮动版本或运行时下载。
+
+## 开发与验证
+
+```sh
+npm ci --ignore-scripts
+npm test
+npm run pack
+QINGZUO_HOST_EXECUTABLE=/path/to/Qingzuo npm run test:host
+QINGZUO_HOST_EXECUTABLE=/path/to/Qingzuo npm run test:market
+```
+
+普通 host 测试使用固定响应验证批次和助手契约；market 测试安装已签名公开制品并检查底座 `app.asar` 未被修改。完整发布流程在 `.github/workflows/release.yml`，需要固定的 `QINGZUO_HOST_RUN_ID`。
+
+## 实现与安全约定
+
+- 代理图片模型只通过宿主 SDK 发现和调用。插件不得读取本机代理密钥、OAuth token 或路径，不得直接访问本机代理；代理来源、型号、提示词和参数必须在批次创建时冻结。
+- 官方模式只使用 manifest 声明的 Google/OpenAI 凭据和 origin。密钥保存、清除和网络调用由可信宿主执行，插件页面不能回显密钥。
+- 保持用户确认、输出目录授权、后台批处理、取消、保存失败、未知状态和恢复语义；未知请求不自动重发，失败只在用户明确操作时重试。
+- 模型目录缺少型号时不能伪造 fallback；模型可见不代表账户有权限。不要为 CI 或市场验收发起真实图像生成、额度消耗或 OAuth 登录。
+- 不要把图片、凭据、访问令牌、代理响应或 `.env*` 写入仓库；`release/`、`output/` 和测试 profile 是生成物。
+
+## 发布与市场边界
+
+- 发布输入必须由 `scripts/verify-release-inputs.mjs` 核对成功的轻作 0.3.0 host run、正式 `v0.3.0` 和固定 `sdk-v1.2.0` Release；tag 必须匹配 `package.json`。
+- 发布生成 macOS arm64 / Windows x64 `.ecplugin` 和目录片段。市场负责检查原始字节、Ed25519 签名和 catalog PR；本仓库不保存市场私钥、不直接修改线上目录。
+- `validation: market` 只验证签名安装、插件启动和底座摘要保持不变，使用 fixture，不等同于真实账户图像质量、费用/额度或 OAuth 验收。
+
+## 变更流程
+
+1. 先阅读受影响的状态/批次模块、`tests/state.test.mjs`、`tests/host.mjs`、`tests/market.mjs` 和发布 workflow。
+2. API 权限、批次状态、来源/模型选择或助手工具变化要同步 manifest、SDK 调用、测试和 README。
+3. 先运行 `npm test`，再运行 `npm run pack` 和固定 host 测试；涉及公开安装时补充 `npm run test:market`。
+4. 检查 `git diff --check`、`git status` 和生成物，报告固定 host/SDK 版本、平台和未完成的真实服务验收。
