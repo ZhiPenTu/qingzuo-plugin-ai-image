@@ -5,7 +5,8 @@ import path from 'node:path';
 import { launchPluginTestHost } from '@commerce/plugin-sdk/testing';
 
 if (!process.env.QINGZUO_HOST_EXECUTABLE) throw new Error('指定固定底座 QINGZUO_HOST_EXECUTABLE。');
-const artifact = path.resolve('release/official.ai-image-0.1.0-' + process.platform + '-' + process.arch + '.ecplugin');
+const pkg = JSON.parse(await readFile('package.json')), platform = process.platform + '-' + process.arch;
+const artifact = path.resolve('release/' + pkg.commerce.id + '-' + pkg.version + '-' + platform + '.ecplugin');
 const host = await launchPluginTestHost({ executablePath: process.env.QINGZUO_HOST_EXECUTABLE, artifactPath: artifact, pluginId: 'official.ai-image' });
 const pageErrors = []; host.plugin.on('pageerror', error => pageErrors.push(error.message)); host.app.context().on('page', page => page.on('pageerror', error => pageErrors.push(error.message)));
 host.app.process().stderr.on('data', data => process.stderr.write(data));
