@@ -4,7 +4,7 @@
   <header class="hero"><div><p class="eyebrow">QINGZUO · IMAGE STUDIO</p><h1>一份灵感，整批出图。</h1><p>把重复的修图交给 AI，让每一张都贴近你的想法。</p></div><div class="service-entry"><button id="open-api-settings" class="secondary">配置图像 API</button><span id="image-service-state">读取服务状态…</span></div></header>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <section id="setup-notice" class="setup-notice" hidden><div><strong>先连接图像服务，再开始批图</strong><p id="setup-description">可以复用轻作 AI 设置中的代理连接，也可以使用官方 API。</p></div><button id="setup-api">配置图像 API</button></section>
-  <dialog id="api-settings" aria-labelledby="api-settings-title"><div class="section-heading"><div><h2 id="api-settings-title">图像 API 配置</h2><p>选择代理服务或官方 API，无需重复填写已有代理密钥。</p></div><button id="close-api-settings" class="quiet" aria-label="关闭图像 API 配置">关闭</button></div><h3>代理服务 · 共享连接</h3><p>复用轻作「AI 设置 → 代理连接」中的连接与配置。在编辑方案中选择外部代理，再刷新图片模型。模型必须支持图片编辑，文本助手的默认模型不受影响。</p><h3>官方 API · 插件专用密钥</h3><div id="credential-fields"></div><p class="hint">仅选择官方 API 时才需要这里的密钥。图片确认后上传，代理调用可能消耗账户额度或产生费用。</p><button id="finish-api-settings" class="secondary">完成配置，返回批图</button></dialog>
+  <dialog id="api-settings" aria-labelledby="api-settings-title"><div class="section-heading"><div><h2 id="api-settings-title">图像 API 配置</h2><p>选择代理服务或官方 API，无需重复填写已有代理密钥。</p></div><button id="close-api-settings" class="quiet" aria-label="关闭图像 API 配置">关闭</button></div><h3>代理服务 · 共享连接</h3><p>复用轻作「AI 设置 → 代理连接」中的连接与配置。在编辑方案中选择外部代理，再刷新图片模型。模型必须支持图片编辑。</p><h3>官方 API · 插件专用密钥</h3><div id="credential-fields"></div><p class="hint">仅选择官方 API 时才需要这里的密钥。图片确认后上传，代理调用可能消耗账户额度或产生费用。</p><button id="finish-api-settings" class="secondary">完成配置，返回批图</button></dialog>
   <div class="layout">
     <section class="workbench">
       <div class="panel"><div class="section-heading"><div><h2>编辑方案</h2><p>选择模型，写下想要的变化。</p></div><button id="pick">＋ 批量导入</button></div>
@@ -19,8 +19,6 @@
       </div>
       <div id="comparison" class="panel" hidden><div class="section-heading"><h2>原图与结果</h2><button id="close-preview" class="quiet">关闭预览</button></div><div class="compare"><figure><figcaption>原图</figcaption><img id="original" alt="原始图片"></figure><figure><figcaption>编辑结果</figcaption><img id="result" alt="编辑后的图片"></figure></div></div>
     </section>
-    <aside>
-      <section class="panel assistant"><div class="section-heading"><div><h2>AI 助手</h2><p>描述需求，一起完善提示词。</p></div><span class="spark">✦</span></div><p class="hint">助手 API / OAuth 请在轻作左侧「AI 设置」中配置。助手会修改草稿，确认后才开始批图。</p><div id="chat" class="chat"><div class="assistant-message">试着说：“统一成电商白底图，保留品牌文字，给第一张加一点阴影。”</div></div><textarea id="message" rows="3" placeholder="描述你的批图需求…"></textarea><div class="actions"><button id="send">发送给助手</button><button id="stop-assistant" class="quiet">停止</button></div></section>
-    </aside>
+
   </div>
 </main><script type="module" src="app.mjs"></script></body></html>

@@ -117,12 +117,7 @@ try {
   await expect(host.plugin.getByLabel('original-1.png 提示词', { exact: true })).toHaveValue('第二张增加阴影');
   await host.plugin.locator('#prepare').click(); await expect(host.plugin.locator('#batch-actions')).toBeVisible();
   draft = (await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.batch.list')))[0]; expect(draft.items[1].prompt).toBe('第二张增加阴影');
-  await host.plugin.locator('#message').fill('优化成统一的电商白底方案'); await host.plugin.locator('#send').click();
-  await expect.poll(async () => { const status = await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.assistant.status')); if (status.error) throw new Error(status.error); return status.history.length; }, { timeout: 30000 }).toBeGreaterThanOrEqual(1);
-  await expect.poll(async () => (await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.assistant.status'))).state).toBe('idle');
-  await expect.poll(async () => (await host.plugin.evaluate(id => window.commercePlugin.invoke('ai.batch.get', { id }), draft.id)).revision).toBe(2);
   expect((await trusted('calls')).length).toBe(0);
-  await expect(host.plugin.locator('#chat')).toContainText('请确认执行');
   await mkdir('output', { recursive: true }); await host.plugin.evaluate(() => window.scrollTo(0, 0)); await host.plugin.screenshot({ path: 'output/preview-plan.png' });
   await host.plugin.evaluate(() => { window.confirm = () => true; });
   await host.plugin.locator('#execute').click();
@@ -183,5 +178,5 @@ try {
   await host.plugin.screenshot({ path: path.join(evidence, '外部代理图片模型.png') });
   expect(pageErrors).toEqual([]);
   console.log('独立安装包验收通过：官方与代理两类接口、代理别名、无需官方密钥、多图保存、模型刷新保留队列、批次来源冻结、确认隔离、默认助手不变；无付费请求。');
-} catch (error) { console.error('验收诊断', await host.plugin.locator('#notice').textContent(), await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.assistant.status')), await trusted('diagnostic')); throw error; }
+} catch (error) { console.error('验收诊断', await host.plugin.locator('#notice').textContent(), await trusted('diagnostic')); throw error; }
 finally { await trusted('clear').catch(() => {}); await host.close(); await new Promise(resolve => server.close(resolve)); }

@@ -1,13 +1,13 @@
 {
   "name": "@commerce/plugin-ai-image",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "commerce": {
     "manifestVersion": 1,
     "id": "official.ai-image",
     "title": "AI 批图",
-    "description": "复用外部代理或官方 API 批量编辑图片，自定义提示词与 AI 助手",
+    "description": "复用外部代理或官方 API 批量编辑图片，支持自定义提示词与多模型批处理",
     "category": "图片处理",
     "api": "^1.2.0",
     "ui": "ui/index.html",
@@ -15,11 +15,10 @@
       "title": "图像 API 配置",
       "entry": "ui/settings.html"
     },
-    "releaseNotes": "更新：中性化代理连接说明，移除旧代理字眼；复用代理图片模型或官方 API，支持逐图提示词、方案确认、后台批处理、结果保存与 Harness AI 助手。需要轻作 0.3.0。",
+    "releaseNotes": "更新：移除插件内置对话 AI，统一使用轻作底座 AI 对话；复用代理图片模型或官方 API，支持逐图提示词、方案确认、后台批处理与结果保存。需要轻作 0.3.0。",
     "permissions": {
       "files": true,
       "ai": [
-        "assistant",
         "image-edit"
       ],
       "credentials": [

@@ -1,11 +1,11 @@
 # AGENTS.md
 
-本仓库是轻作独立 `official.ai-image` 插件，提供批量图像编辑、外部代理图片模型和宿主 AI 助手入口。它依赖轻作 0.3.0 / 插件 API 1.2；桌面底座和市场目录在其他仓库维护。
+本仓库是轻作独立 `official.ai-image` 插件，提供批量图像编辑与外部代理图片模型。统一使用轻作底座「AI 对话」，插件不内置对话 AI。它依赖轻作 0.3.0 / 插件 API 1.2；桌面底座和市场目录在其他仓库维护。
 
 ## 项目边界
 
-- `ui/` 包含批次、配置和助手界面；`tests/` 包含状态、固定响应 host 和公开市场测试；`scripts/pack-plugin.mjs` 生成平台制品和目录片段；`scripts/verify-release-inputs.mjs` 校验固定底座与 SDK Release。
-- manifest 的权限必须保持最小：`files`、`ai: ['assistant', 'image-edit']`、声明的 Google/OpenAI origin 和隔离凭据。
+- `ui/` 包含批次和配置界面；`tests/` 包含状态、固定响应 host 和公开市场测试；`scripts/pack-plugin.mjs` 生成平台制品和目录片段；`scripts/verify-release-inputs.mjs` 校验固定底座与 SDK Release。
+- manifest 的权限必须保持最小：`files`、`ai: ['image-edit']`、声明的 Google/OpenAI origin 和隔离凭据。
 - SDK 1.2.0 tarball 随项目固定保存，并在发布时对照 `sdk-v1.2.0` Release 校验；不要改用浮动版本或运行时下载。
 
 ## 开发与验证

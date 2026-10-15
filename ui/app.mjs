@@ -2,7 +2,7 @@ import { createPluginClient } from './sdk.mjs';
 import { batchInput, progress, stateLabels, preferredModelId } from './state.mjs';
 import { setupCredentials } from './credentials.mjs';
 const client = createPluginClient(), element = id => document.getElementById(id);
-let models = [], selected = [], overrides = new Map(), current = null, history = [], directory = null, previewTokens = [], assistantRunning = false, draftBusy = false;
+let models = [], selected = [], overrides = new Map(), current = null, history = [], directory = null, previewTokens = [], draftBusy = false;
 let configuredKeys = {}, proxyModels = [], proxyState = 'idle', proxyMessage = '';
 const thumbnails = new Map();
 function notice(text, error = false) { element('notice').hidden = !text; element('notice').textContent = text; element('notice').classList.toggle('error', error); }
@@ -25,7 +25,7 @@ function choices(id, values) { const select = element(id); select.replaceChildre
 function renderParameters() {
   const selectedModel = model();
   for (const [id, values] of [['size', selectedModel?.sizes], ['ratio', selectedModel?.ratios], ['quality', selectedModel?.qualities]]) { const previous = element(id).value; choices(id, values || []); if (values?.includes(previous)) element(id).value = previous; element(id + '-label').hidden = !values?.length; }
-  element('model-hint').textContent = element('source').value === 'proxy' ? '复用轻作代理账户，不改变默认助手模型。' + (selectedModel && !selectedModel.sizes.length && !selectedModel.ratios?.length && !selectedModel.qualities?.length ? '此模型未声明可调参数，使用服务默认参数；不会替换型号。' : '图片确认后才上传；刷新列表不生成图片。') : '使用插件专用官方 API Key；图片确认后才上传。';
+  element('model-hint').textContent = element('source').value === 'proxy' ? '复用轻作代理账户。' + (selectedModel && !selectedModel.sizes.length && !selectedModel.ratios?.length && !selectedModel.qualities?.length ? '此模型未声明可调参数，使用服务默认参数；不会替换型号。' : '图片确认后才上传；刷新列表不生成图片。') : '使用插件专用官方 API Key；图片确认后才上传。';
   render();
 }
 function renderModels() {
@@ -83,7 +83,7 @@ async function execute(retryFailed = false) {
 }
 function templates() { try { return JSON.parse(localStorage.getItem('prompt-templates') || '[]').filter(item => typeof item.name === 'string' && typeof item.prompt === 'string').slice(0, 50); } catch { return []; } }
 function renderTemplates() { element('templates').replaceChildren(new Option('选择模板', ''), ...templates().map((template, index) => new Option(template.name, String(index)))); }
-function renderChat(session) { assistantRunning = session.state === 'running'; element('send').disabled = assistantRunning; element('chat').replaceChildren(...session.history.map(message => { const bubble = document.createElement('div'); bubble.className = message.role === 'user' ? 'user-message' : 'assistant-message'; bubble.textContent = message.text; return bubble; })); if (session.error) notice(session.error, true); element('chat').scrollTop = element('chat').scrollHeight; }
+
 element('provider').onchange = renderModels; element('model').onchange = renderParameters;
 element('source').value = localStorage.getItem('image-source') === 'official' ? 'official' : 'proxy';
 element('source').onchange = () => { localStorage.setItem('image-source', element('source').value); renderModels(); if (element('source').value === 'proxy') void refreshProxy(); };
@@ -97,8 +97,7 @@ element('close-preview').onclick = () => void action(async () => { element('comp
 element('save-template').onclick = () => { const prompt = element('prompt').value.trim(); if (!prompt) return notice('请先填写提示词。', true); const values = templates(); values.push({ name: prompt.slice(0, 24), prompt }); localStorage.setItem('prompt-templates', JSON.stringify(values.slice(-50))); renderTemplates(); notice('提示词模板已保存。'); };
 element('delete-template').onclick = () => { const index = element('templates').value; if (index === '') return; const values = templates(); values.splice(Number(index), 1); localStorage.setItem('prompt-templates', JSON.stringify(values)); renderTemplates(); };
 element('templates').onchange = () => { const index = element('templates').value; if (index !== '') element('prompt').value = templates()[Number(index)].prompt; };
-element('send').onclick = () => void action(async () => { const text = element('message').value.trim(); if (!text || assistantRunning) return; if (!current && selected.length) { if (!element('prompt').value.trim()) element('prompt').value = text; await prepare(); } const session = await client.ai.assistant.send({ text, batchId: current?.id }); element('message').value = ''; renderChat(session); });
-element('stop-assistant').onclick = () => void action(async () => renderChat(await client.ai.assistant.cancel()));
-client.ai.onEvent(event => { if (event.type === 'batch') { if (event.batch.id === current?.id) { current = event.batch; render(); } } else if (event.type === 'assistant') { renderChat(event.session); void action(refresh); } else if (event.type === 'assistant-delta') { let bubble = element('chat').querySelector('.streaming'); if (!bubble) { bubble = document.createElement('div'); bubble.className = 'assistant-message streaming'; element('chat').append(bubble); } bubble.textContent += event.text; element('chat').scrollTop = element('chat').scrollHeight; } });
-await action(async () => { const [catalog, assistant] = await Promise.all([client.ai.models(), client.ai.assistant.status(), credentials.refresh()]); models = catalog; renderModels(); renderTemplates(); renderChat(assistant); await refresh(); });
+
+client.ai.onEvent(event => { if (event.type === 'batch') { if (event.batch.id === current?.id) { current = event.batch; render(); } } });
+await action(async () => { const [catalog] = await Promise.all([client.ai.models(), credentials.refresh()]); models = catalog; renderModels(); renderTemplates(); await refresh(); });
 if (element('source').value === 'proxy') await refreshProxy();
