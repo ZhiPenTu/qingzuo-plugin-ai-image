@@ -1,6 +1,6 @@
 {
   "name": "@commerce/plugin-ai-image",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "commerce": {
@@ -11,7 +11,7 @@
     "category": "图片处理",
     "api": "^1.2.0",
     "ui": "ui/index.html",
-    "releaseNotes": "图像服务统一由轻作设置管理，插件不再保存服务商密钥或直接访问图像 API。",
+    "releaseNotes": "界面配色统一为轻作底座语义色，支持跟随系统的浅色与深色模式。",
     "permissions": {
       "files": true,
       "ai": [
