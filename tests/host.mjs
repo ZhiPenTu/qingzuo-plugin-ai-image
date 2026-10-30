@@ -47,9 +47,9 @@ const server = createServer(async (request, response) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jAdkAAAAASUVORK5CYII=', 'base64');
 async function trusted(work, args) {
-  return host.app.evaluate(async (_electron, input) => {
+  return host.app.evaluate(async ({ app }, input) => {
     const vm = process.getBuiltinModule('node:vm'), path = process.getBuiltinModule('node:path'), url = process.getBuiltinModule('node:url');
-    const runtimeURL = url.pathToFileURL(path.join(process.resourcesPath, 'app.asar/desktop/main.mjs')).href;
+    const runtimeURL = url.pathToFileURL(path.join(app.getAppPath(), 'desktop/main.mjs')).href;
     const runtime = await vm.runInThisContext('import(' + JSON.stringify(runtimeURL) + ')', { importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER });
     if (input.work === 'fixture') {
       globalThis.qingzuoImageCalls = [];
@@ -64,55 +64,54 @@ async function trusted(work, args) {
       };
     } else if (input.work === 'calls') return globalThis.qingzuoImageCalls;
     else if (input.work === 'diagnostic') return runtime.host.stdout?.read()?.toString() || 'no kernel stdout';
-    else if (input.work === 'clear-images' || input.work === 'clear') { if (input.work === 'clear') await runtime.proxy.credentials.clear('system.ai', 'external'); for (const name of ['google-image', 'openai-image']) await runtime.proxy.credentials.clear('official.ai-image', name); }
+    else if (input.work === 'configure-shared') return {
+      google: await runtime.imageEditor.configureShared({ provider: 'google', apiKey: input.args.google }),
+      openai: await runtime.imageEditor.configureShared({ provider: 'openai', apiKey: input.args.openai }),
+    };
+    else if (input.work === 'clear-images' || input.work === 'clear') {
+      if (input.work === 'clear') await runtime.proxy.credentials.clear('system.ai', 'external').catch(() => {});
+      for (const name of ['google-image', 'openai-image']) {
+        await runtime.proxy.credentials.clear('system.ai', name).catch(() => {});
+        await runtime.proxy.credentials.clear('official.ai-image', name).catch(() => {});
+      }
+    }
   }, { work, args });
 }
 try {
-  expect((await host.page.evaluate(() => window.commerceDesktop.invoke('status'))).version).toBe('0.3.0');
+  expect((await host.page.evaluate(() => window.commerceDesktop.invoke('status'))).version).toMatch(/^\d+\.\d+\.\d+$/);
+  expect(pkg.commerce.settings).toBeUndefined();
+  expect(pkg.commerce.permissions).toEqual({ files: true, ai: ['image-edit'] });
   const inputs = [];
   for (let index = 0; index < 4; index++) { const filename = path.join(host.temporary, 'original-' + index + '.png'); await writeFile(filename, png); inputs.push(filename); }
   const output = path.join(host.temporary, 'results'); await mkdir(output);
   await host.app.evaluate(({ dialog }, { inputs, output }) => { dialog.showOpenDialog = async options => ({ canceled: false, filePaths: options.properties.includes('openDirectory') ? [output] : inputs }); }, { inputs, output });
   await trusted('fixture', { png: png.toString('base64') });
   expect((await host.page.evaluate(() => window.commerceDesktop.invoke('ai.start'))).running).toBe(true);
-  expect(await host.page.evaluate(() => window.commerceDesktop.invoke('ai.accounts'))).toEqual([]);
+  expect(await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.models', { source: 'official' }))).toEqual([]);
+  expect(await host.plugin.evaluate(() => window.commercePlugin.invoke('credentials.status', { name: 'google-image' }).then(() => null, error => error.message))).toMatch(/未授权/);
+  expect(await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.configureImage', { provider: 'google', apiKey: 'hidden' }).then(() => null, error => error.message))).toMatch(/无效/);
+  await expect(host.plugin.locator('#open-api-settings')).toHaveCount(0);
+  await expect(host.plugin.locator('#source')).toHaveValue('proxy');
   if (process.env.QINGZUO_UI_EVIDENCE_DIR) {
     await mkdir(process.env.QINGZUO_UI_EVIDENCE_DIR, { recursive: true });
     await host.page.getByRole('button', { name: 'AI 设置', exact: true }).click();
-    await host.page.getByRole('button', { name: '账户与 API', exact: true }).click();
-    await host.page.getByRole('button', { name: 'OAuth 登录', exact: true }).click();
-    await host.page.screenshot({ path: path.join(process.env.QINGZUO_UI_EVIDENCE_DIR, 'AI设置界面.png') });
-    await host.page.getByRole('button', { name: '图像 API', exact: true }).click();
-    await host.page.getByRole('button', { name: '配置图像 API', exact: true }).click();
-    await expect(host.plugin.getByRole('heading', { name: '图像 API 配置', exact: true })).toBeVisible();
-    await host.plugin.screenshot({ path: path.join(process.env.QINGZUO_UI_EVIDENCE_DIR, '图像API配置界面.png') });
-    await host.plugin.getByRole('link', { name: '返回 AI 批图' }).click();
+    await expect(host.page.getByRole('heading', { name: '共享图像能力', exact: true })).toBeVisible();
+    await expect(host.page.getByText('AI 批图', { exact: true })).toHaveCount(0);
+    await host.page.screenshot({ path: path.join(process.env.QINGZUO_UI_EVIDENCE_DIR, '共享AI设置界面.png') });
   }
   await host.page.evaluate(() => window.commerceDesktop.invoke('ai.stop'));
   await host.page.evaluate(async base => { await window.commerceDesktop.invoke('ai.configure', { mode: 'external', address: base, apiKey: 'fixture-text', model: 'fixture-plan' }); await window.commerceDesktop.invoke('ai.verify'); }, 'http://127.0.0.1:' + server.address().port);
-  await host.plugin.locator('#open-api-settings').click();
-  await host.plugin.locator('#google-key').fill('fixture-google'); await host.plugin.locator('[data-key="google"]').click(); await expect(host.plugin.locator('#google-key')).toHaveValue('');
-  await host.plugin.locator('#openai-key').fill('fixture-openai'); await host.plugin.locator('[data-key="openai"]').click();
-  await expect(host.plugin.locator('#openai-status')).toHaveText('已配置');
-  await host.plugin.locator('#finish-api-settings').click();
-  await expect(host.plugin.locator('#api-settings')).not.toBeVisible();
-  await host.page.getByRole('button', { name: 'AI 设置', exact: true }).click();
-  await host.page.getByRole('button', { name: '账户与 API', exact: true }).click();
-  await expect(host.page.getByRole('heading', { name: 'OAuth 账户登录' })).toBeVisible();
-  await expect(host.page.getByRole('button', { name: '登录 Codex' })).toBeDisabled();
-  await host.page.getByRole('button', { name: '图像 API', exact: true }).click();
-  await host.page.getByRole('button', { name: '配置图像 API', exact: true }).click();
-  await expect(host.plugin.getByRole('heading', { name: '图像 API 配置', exact: true })).toBeVisible();
-  await expect(host.plugin.locator('#google-status')).toHaveText('已配置');
-  await expect(host.plugin.locator('#google-key')).toHaveValue('');
-  await host.plugin.getByRole('link', { name: '返回 AI 批图' }).click();
+  const shared = await trusted('configure-shared', { google: 'fixture-google', openai: 'fixture-openai' });
+  expect(shared.google.google).toMatchObject({ configured: true, source: 'dedicated' });
+  expect(shared.openai.openai).toMatchObject({ configured: true, source: 'dedicated' });
   await host.plugin.locator('#source').selectOption('official');
+  await host.plugin.locator('#refresh-service').click();
+  await expect(host.plugin.locator('#image-service-state')).toContainText('4 个图像模型');
+  expect(await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.models', { source: 'official' }))).toHaveLength(4);
   await host.plugin.locator('#pick').click(); await expect(host.plugin.locator('#count')).toHaveText('4');
   await host.plugin.locator('#prompt').fill('统一白底，保留商品');
   await host.plugin.getByLabel('original-1.png 提示词', { exact: true }).fill('第二张增加阴影');
-  await host.plugin.locator('#open-api-settings').click();
-  await expect(host.plugin.locator('#google-key')).toHaveValue('');
-  await host.plugin.locator('#finish-api-settings').click();
+  await host.plugin.locator('#refresh-service').click();
   await expect(host.plugin.locator('#count')).toHaveText('4');
   await expect(host.plugin.locator('#prompt')).toHaveValue('统一白底，保留商品');
   await expect(host.plugin.getByLabel('original-1.png 提示词', { exact: true })).toHaveValue('第二张增加阴影');
@@ -151,7 +150,7 @@ try {
   proxyCatalog = imageCatalog; await host.plugin.locator('#refresh-models').click();
   await expect(host.plugin.locator('#proxy-state')).toContainText('3 个图片模型');
   await host.plugin.locator('#prepare').click();
-  await expect(host.plugin.locator('#batch-status')).toContainText('外部代理');
+  await expect(host.plugin.locator('#batch-status')).toContainText('共享连接');
   await expect(host.plugin.locator('#execute')).toBeEnabled();
   const proxyBatch = (await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.batch.list')))[0];
   expect(proxyBatch.source).toBe('proxy'); expect(proxyCalls).toHaveLength(0);
@@ -160,7 +159,7 @@ try {
   await host.plugin.locator('#source').selectOption('official');
   await host.plugin.evaluate(() => { window.confirm = message => { window.lastConfirmation = message; return true; }; });
   await host.plugin.locator('#execute').click(); await expect.poll(async () => (await readdir(output)).length).toBe(9);
-  expect(await host.plugin.evaluate(() => window.lastConfirmation)).toContain('外部代理');
+  expect(await host.plugin.evaluate(() => window.lastConfirmation)).toContain('共享连接');
   expect(proxyCalls).toHaveLength(4); expect(proxyCalls.every(call => call.endpoint.includes('gemini-3.1-flash-image-preview'))).toBe(true);
   expect((await host.page.evaluate(() => window.commerceDesktop.invoke('ai.status'))).model).toBe('fixture-plan');
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#pick').click(); await host.plugin.locator('#source').selectOption('proxy');
@@ -173,11 +172,11 @@ try {
   await expect.poll(async () => (await readdir(output)).length).toBe(11); expect(proxyCalls.at(-1).model).toBe('studio-edit');
   const evidence = process.env.QINGZUO_UI_EVIDENCE_DIR || 'output'; await mkdir(evidence, { recursive: true });
   await host.plugin.evaluate(() => window.scrollTo(0, 0));
-  await host.plugin.screenshot({ path: path.join(evidence, '外部代理批图界面.png') });
+  await host.plugin.screenshot({ path: path.join(evidence, '共享连接批图界面.png') });
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#provider').selectOption('openai');
   await host.plugin.evaluate(() => window.scrollTo(0, 0));
-  await host.plugin.screenshot({ path: path.join(evidence, '外部代理图片模型.png') });
+  await host.plugin.screenshot({ path: path.join(evidence, '共享连接图片模型.png') });
   expect(pageErrors).toEqual([]);
-  console.log('独立安装包验收通过：官方与代理两类接口、代理别名、无需官方密钥、多图保存、模型刷新保留队列、批次来源冻结、确认隔离、默认助手不变；无付费请求。');
+  console.log('独立安装包验收通过：底座共享官方与共享连接、旧插件无密钥权限、多图保存、模型刷新保留队列、批次来源冻结、确认隔离、默认助手不变；无付费请求。');
 } catch (error) { console.error('验收诊断', await host.plugin.locator('#notice').textContent(), await trusted('diagnostic')); throw error; }
 finally { await trusted('clear').catch(() => {}); await host.close(); await new Promise(resolve => server.close(resolve)); }
