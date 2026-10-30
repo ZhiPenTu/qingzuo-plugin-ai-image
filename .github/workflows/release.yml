@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       host_run_id:
-        description: 'Successful Qingzuo v0.3.0 Release commerce desktop run ID'
+        description: 'Successful Qingzuo v0.6.6 Release commerce desktop run ID'
         required: true
         type: string
       validation:
@@ -28,6 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       QINGZUO_HOST_RUN_ID: ${{ inputs.host_run_id || vars.QINGZUO_HOST_RUN_ID }}
+      QINGZUO_HOST_VERSION: v0.6.6
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +48,9 @@ jobs:
       - name: Prepare host outside the plugin source directory
         run: |
           if [[ "$RUNNER_OS" == macOS ]]; then
-            ditto -x -k host/desktop/CommerceTools-0.3.0-mac-arm64.zip "$RUNNER_TEMP/qingzuo-runtime"
+            archive=$(find host/desktop -maxdepth 1 -name 'CommerceTools-*-mac-arm64.zip' -print -quit)
+            test -n "$archive"
+            ditto -x -k "$archive" "$RUNNER_TEMP/qingzuo-runtime"
             echo "QINGZUO_HOST_EXECUTABLE=$RUNNER_TEMP/qingzuo-runtime/Qingzuo.app/Contents/MacOS/Qingzuo" >> "$GITHUB_ENV"
           else
             node --input-type=module -e "import {cp} from 'node:fs/promises';import path from 'node:path';await cp('host/desktop/win-unpacked',path.join(process.env.RUNNER_TEMP,'qingzuo-runtime'),{recursive:true});"

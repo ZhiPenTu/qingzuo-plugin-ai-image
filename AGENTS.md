@@ -30,7 +30,7 @@ QINGZUO_HOST_EXECUTABLE=/path/to/Qingzuo npm run test:market
 
 ## 发布与市场边界
 
-- 发布输入必须由 `scripts/verify-release-inputs.mjs` 核对成功的轻作 0.3.0 host run、正式 `v0.3.0` 和固定 `sdk-v1.2.0` Release；tag 必须匹配 `package.json`。
+- 发布输入必须由 `scripts/verify-release-inputs.mjs` 核对成功的轻作 0.6.6 host run、正式 `v0.6.6` 和固定 `sdk-v1.2.0` Release；tag 必须匹配 `package.json`。
 - 发布生成 macOS arm64 / Windows x64 `.ecplugin` 和目录片段。市场负责检查原始字节、Ed25519 签名和 catalog PR；本仓库不保存市场私钥、不直接修改线上目录。
 - `validation: market` 只验证签名安装、插件启动和底座摘要保持不变，使用 fixture，不等同于真实账户图像质量、费用/额度或 OAuth 验收。
 
