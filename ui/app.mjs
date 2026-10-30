@@ -1,23 +1,16 @@
 import { createPluginClient } from './sdk.mjs';
 import { batchInput, progress, stateLabels, preferredModelId } from './state.mjs';
-import { setupCredentials } from './credentials.mjs';
 const client = createPluginClient(), element = id => document.getElementById(id);
 let models = [], selected = [], overrides = new Map(), current = null, history = [], directory = null, previewTokens = [], draftBusy = false;
-let configuredKeys = {}, proxyModels = [], proxyState = 'idle', proxyMessage = '';
+let proxyModels = [], proxyState = 'idle', proxyMessage = '';
 const thumbnails = new Map();
 function notice(text, error = false) { element('notice').hidden = !text; element('notice').textContent = text; element('notice').classList.toggle('error', error); }
-const credentials = setupCredentials(client, element('credential-fields'), notice, configured => {
-  configuredKeys = configured; renderService();
-});
 function renderService() {
   const proxied = element('source').value === 'proxy';
-  element('image-service-state').textContent = proxied ? proxyMessage || '外部代理 · 待刷新模型' : ['Google ' + (configuredKeys.google ? '已配置' : '未配置'), 'OpenAI ' + (configuredKeys.openai ? '已配置' : '未配置')].join(' · ');
-  element('setup-notice').hidden = proxied ? proxyState === 'loading' || proxyModels.length > 0 : Boolean(configuredKeys.google || configuredKeys.openai);
-  element('setup-description').textContent = proxied ? '在轻作「AI 设置 → 代理连接」配置外部代理，然后刷新模型；无需填写官方 API Key。' : '此来源使用插件专用的 Google / OpenAI 官方 API Key。';
+  element('image-service-state').textContent = proxied ? proxyMessage || '共享连接 · 待刷新模型' : models.length ? '共享官方服务 · ' + models.length + ' 个图像模型' : '共享官方服务 · 尚未配置';
+  element('setup-notice').hidden = proxied ? proxyState === 'loading' || proxyModels.length > 0 : models.length > 0;
+  element('setup-description').textContent = proxied ? '在轻作「AI 设置」中完成共享连接，然后刷新图片模型。' : '在轻作「AI 设置 → 共享图像能力」配置官方服务，然后刷新模型。插件不会保存服务商密钥。';
 }
-for (const id of ['open-api-settings', 'setup-api']) element(id).onclick = () => element('api-settings').showModal();
-for (const id of ['close-api-settings', 'finish-api-settings']) element(id).onclick = () => element('api-settings').close();
-element('api-settings').addEventListener('close', () => credentials.clearInputs());
 async function action(work) { try { await work(); } catch (error) { notice(error.message || String(error), true); } }
 function catalog() { return element('source').value === 'proxy' ? proxyModels : models; }
 function model() { return catalog().find(item => item.id === element('model').value); }
@@ -25,7 +18,7 @@ function choices(id, values) { const select = element(id); select.replaceChildre
 function renderParameters() {
   const selectedModel = model();
   for (const [id, values] of [['size', selectedModel?.sizes], ['ratio', selectedModel?.ratios], ['quality', selectedModel?.qualities]]) { const previous = element(id).value; choices(id, values || []); if (values?.includes(previous)) element(id).value = previous; element(id + '-label').hidden = !values?.length; }
-  element('model-hint').textContent = element('source').value === 'proxy' ? '复用轻作代理账户。' + (selectedModel && !selectedModel.sizes.length && !selectedModel.ratios?.length && !selectedModel.qualities?.length ? '此模型未声明可调参数，使用服务默认参数；不会替换型号。' : '图片确认后才上传；刷新列表不生成图片。') : '使用插件专用官方 API Key；图片确认后才上传。';
+  element('model-hint').textContent = element('source').value === 'proxy' ? '复用轻作共享连接。' + (selectedModel && !selectedModel.sizes.length && !selectedModel.ratios?.length && !selectedModel.qualities?.length ? '此模型未声明可调参数，使用服务默认参数；不会替换型号。' : '图片确认后才上传；刷新列表不生成图片。') : '使用轻作统一配置的共享官方图像服务；图片确认后才上传。';
   render();
 }
 function renderModels() {
@@ -39,18 +32,25 @@ function renderModels() {
 function parameters() { const selectedModel = model(), values = {}; for (const [key, options] of [['size', selectedModel.sizes], ['ratio', selectedModel.ratios], ['quality', selectedModel.qualities]]) if (options?.length) values[key] = element(key).value; return values; }
 async function refreshProxy() {
   if (proxyState === 'loading') return;
-  proxyState = 'loading'; proxyMessage = '正在读取代理图片模型…'; element('proxy-state').textContent = proxyMessage; element('refresh-models').disabled = true; renderService(); render();
-  try { const catalog = await client.ai.models({ source: 'proxy' }); if (!Array.isArray(catalog) || catalog.some(model => model.source !== 'proxy')) throw new Error('请更新轻作本地版本：当前底座未提供代理图片模型接口。'); proxyModels = catalog; proxyState = 'ready'; proxyMessage = proxyModels.length ? '外部代理 · ' + proxyModels.length + ' 个图片模型' : '代理尚未发现可编辑图片的模型。请检查代理设置与图片模型配置。'; }
-  catch (error) { proxyModels = []; proxyState = 'error'; proxyMessage = error.message || '无法连接代理，请检查轻作 AI 设置。'; }
+  proxyState = 'loading'; proxyMessage = '正在读取兼容服务模型…'; element('proxy-state').textContent = proxyMessage; element('refresh-models').disabled = true; renderService(); render();
+  try { const catalog = await client.ai.models({ source: 'proxy' }); if (!Array.isArray(catalog) || catalog.some(model => model.source !== 'proxy')) throw new Error('请更新轻作：当前版本不支持共享图片模型。'); proxyModels = catalog; proxyState = 'ready'; proxyMessage = proxyModels.length ? '共享连接 · ' + proxyModels.length + ' 个图片模型' : '共享连接尚未发现可编辑图片的模型。请检查服务设置与图片模型配置。'; }
+  catch (error) { proxyModels = []; proxyState = 'error'; proxyMessage = error.message || '无法读取共享连接，请检查轻作 AI 设置。'; }
   finally { element('proxy-state').textContent = proxyMessage; element('refresh-models').disabled = false; renderModels(); }
 }
+async function refreshOfficial() {
+  const button = element('refresh-service'); button.disabled = true;
+  try { const catalog = await client.ai.models({ source: 'official' }); if (!Array.isArray(catalog) || catalog.some(model => model.source !== 'official')) throw new Error('当前底座未提供共享官方图像模型接口。'); models = catalog; }
+  catch (error) { models = []; notice(error.message || '无法读取共享图像服务，请检查轻作 AI 设置。', true); }
+  finally { button.disabled = false; renderModels(); }
+}
+async function refreshSelected() { if (element('source').value === 'proxy') await refreshProxy(); else await refreshOfficial(); }
 function render() {
   const items = current ? current.items : selected, running = current?.state === 'running' || current?.state === 'canceling';
   element('count').textContent = items.length; element('prepare').disabled = !selected.length || draftBusy || !model() || element('source').value === 'proxy' && proxyState === 'loading'; element('trial').disabled = element('prepare').disabled;
   element('batch-actions').hidden = !current; element('execute').disabled = !current || running || draftBusy || current.state === 'finished' && !current.items.some(item => item.state === 'pending');
   element('execute').textContent = current?.state === 'draft' ? '确认方案并执行' : '授权目录并恢复未开始项';
   element('cancel').disabled = !running; element('retry').disabled = !current || running || draftBusy || !current.items.some(item => ['failed', 'save-failed'].includes(item.state));
-  if (current) { element('progress-bar').style.width = progress(current) + '%'; element('batch-status').textContent = current.items.filter(item => item.state === 'succeeded').length + ' / ' + items.length + ' 张已保存 · ' + (current.source === 'proxy' ? '外部代理' : '官方 API') + ' · ' + current.modelId + ' · ' + ({ draft: '等待确认方案', running: '后台执行中', canceling: '正在停止', canceled: '已停止', interrupted: '执行中断', finished: '批次结束' })[current.state]; }
+  if (current) { element('progress-bar').style.width = progress(current) + '%'; element('batch-status').textContent = current.items.filter(item => item.state === 'succeeded').length + ' / ' + items.length + ' 张已保存 · ' + (current.source === 'proxy' ? '共享连接' : '共享官方服务') + ' · ' + current.modelId + ' · ' + ({ draft: '等待确认方案', running: '后台执行中', canceling: '正在停止', canceled: '已停止', interrupted: '执行中断', finished: '批次结束' })[current.state]; }
   const queue = element('queue');
   if (!items.length) { queue.innerHTML = '<div class="empty"><span>✧</span><h3>从一张图片开始</h3><p>PNG、JPEG、WebP · 单张不超过 25 MB</p></div>'; return; }
   queue.replaceChildren();
@@ -77,7 +77,7 @@ async function refresh() { history = await client.ai.batch.list(); const select 
 async function prepare(single = false) { if (draftBusy) return; if (!model()) throw new Error('请先选择可用的图片模型。'); draftBusy = true; render(); try { current = await client.ai.batch.create(batchInput(single ? selected.slice(0, 1) : selected, overrides, model(), parameters(), element('prompt').value, single ? 1 : Number(element('concurrency').value))); await refresh(); notice('方案已准备，请检查逐图提示词，再确认执行。'); } finally { draftBusy = false; render(); } }
 async function execute(retryFailed = false) {
   if (!current) return;
-  if (!window.confirm('确认使用 ' + current.modelId + ' 处理本批次？\n' + (current.source === 'proxy' ? '每张图片会发送至已配置的外部代理，可能消耗额度或产生费用。' : '每张图片会发送至官方服务，按 API 规则计费。') + (retryFailed ? '\n失败项将重新请求；保存失败项只重新保存。' : ''))) return;
+  if (!window.confirm('确认使用 ' + current.modelId + ' 处理本批次？\n' + (current.source === 'proxy' ? '每张图片会发送至轻作共享连接，可能消耗额度或产生费用。' : '每张图片会发送至轻作共享官方图像服务，按 API 规则计费。') + (retryFailed ? '\n失败项将重新请求；保存失败项只重新保存。' : ''))) return;
   directory = await client.files.pickDirectory(); if (!directory) return;
   current = await client.ai.batch.start({ id: current.id, revision: current.revision, directoryToken: directory.token, retryFailed }); render(); notice('已开始后台处理，结果逐张保存到 ' + directory.name + '。');
 }
@@ -85,9 +85,12 @@ function templates() { try { return JSON.parse(localStorage.getItem('prompt-temp
 function renderTemplates() { element('templates').replaceChildren(new Option('选择模板', ''), ...templates().map((template, index) => new Option(template.name, String(index)))); }
 
 element('provider').onchange = renderModels; element('model').onchange = renderParameters;
-element('source').value = localStorage.getItem('image-source') === 'official' ? 'official' : 'proxy';
-element('source').onchange = () => { localStorage.setItem('image-source', element('source').value); renderModels(); if (element('source').value === 'proxy') void refreshProxy(); };
+const savedSource = localStorage.getItem('image-source');
+element('source').value = savedSource === 'official' || savedSource === 'proxy' ? savedSource : 'proxy';
+element('source').onchange = () => { localStorage.setItem('image-source', element('source').value); renderModels(); void refreshSelected(); };
 element('refresh-models').onclick = () => void refreshProxy();
+element('refresh-service').onclick = () => void refreshSelected();
+element('setup-refresh').onclick = () => void refreshSelected();
 element('pick').onclick = () => void action(async () => { if (current) { current = null; overrides = new Map(); } const files = await client.files.pickMany(); selected.push(...files); for (const file of files) thumbnails.set(file.token, await client.files.url(file.token)); render(); });
 element('prepare').onclick = () => void action(() => prepare()); element('trial').onclick = () => void action(() => prepare(true)); element('execute').onclick = () => void action(() => execute()); element('retry').onclick = () => void action(() => execute(true));
 element('cancel').onclick = () => void action(async () => { current = await client.ai.batch.cancel({ id: current.id }); render(); });
@@ -99,5 +102,9 @@ element('delete-template').onclick = () => { const index = element('templates').
 element('templates').onchange = () => { const index = element('templates').value; if (index !== '') element('prompt').value = templates()[Number(index)].prompt; };
 
 client.ai.onEvent(event => { if (event.type === 'batch') { if (event.batch.id === current?.id) { current = event.batch; render(); } } });
-await action(async () => { const [catalog] = await Promise.all([client.ai.models(), credentials.refresh()]); models = catalog; renderModels(); renderTemplates(); await refresh(); });
+await action(async () => {
+  models = await client.ai.models({ source: 'official' });
+  if (!savedSource && models.length) { element('source').value = 'official'; localStorage.setItem('image-source', 'official'); }
+  renderModels(); renderTemplates(); await refresh();
+});
 if (element('source').value === 'proxy') await refreshProxy();

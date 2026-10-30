@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const executablePath = process.env.QINGZUO_HOST_EXECUTABLE;
 if (!executablePath) throw new Error('指定固定底座 QINGZUO_HOST_EXECUTABLE。');
+const hostVersion = process.env.QINGZUO_HOST_VERSION || '0.6.6';
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'qingzuo-market-ai-'));
 const applicationRoot = process.platform === 'darwin' ? path.resolve(executablePath, '../../..') : path.dirname(executablePath);
 const archive = path.join(applicationRoot, process.platform === 'darwin' ? 'Contents/Resources/app.asar' : 'resources/app.asar');
@@ -17,8 +18,8 @@ let app;
 try {
   app = await _electron.launch({ executablePath, args: ['--user-data-dir=' + path.join(temporary, 'profile')], cwd: temporary, env: environment });
   const page = await app.firstWindow();
-  await expect(page.getByText('Harness 内核已连接')).toBeVisible({ timeout: 60000 });
-  expect((await page.evaluate(() => window.commerceDesktop.invoke('status'))).version).toBe('0.3.0');
+  await expect(page.getByText(/工具服务已就绪|Harness 内核已连接/)).toBeVisible({ timeout: 60000 });
+  expect((await page.evaluate(() => window.commerceDesktop.invoke('status'))).version).toBe(hostVersion);
   await page.getByRole('button', { name: '插件市场', exact: true }).click();
   const card = page.locator('[data-slot="card"]').filter({ has: page.getByRole('heading', { name: 'AI 批图', exact: true }) });
   await expect(card).toBeVisible({ timeout: 120000 });
@@ -28,7 +29,8 @@ try {
     if (installed) return installed;
     if (await page.getByRole('alert').isVisible()) throw new Error(await page.getByRole('alert').innerText());
     return null;
-  }, { timeout: 120000 }).toMatchObject({ version: '0.1.0', source: 'market', enabled: true });
+  }, { timeout: 120000 }).toMatchObject({ source: 'market', enabled: true });
+  const marketPlugin = (await page.evaluate(() => window.commerceDesktop.invoke('status'))).plugins.find(plugin => plugin.id === 'official.ai-image');
   await page.getByRole('button', { name: '工具中心', exact: true }).click();
   const installed = page.locator('[data-slot="card"]').filter({ has: page.getByRole('heading', { name: 'AI 批图', exact: true }) });
   await installed.getByRole('button', { name: '打开工具', exact: true }).click();
@@ -39,7 +41,7 @@ try {
   expect(createHash('sha256').update(await readFile(archive)).digest('hex')).toBe(digest);
   await mkdir('output', { recursive: true });
   await plugin.screenshot({ path: 'output/market-installed.png' });
-  await writeFile('output/market-verification.json', JSON.stringify({ platform: process.platform + '-' + process.arch, hostVersion: '0.3.0', hostRunId: process.env.QINGZUO_HOST_RUN_ID, hostSha256: digest, pluginVersion: '0.1.0', source: 'signed public market', hostUnchanged: true, paidRequests: 0 }, null, 2));
+  await writeFile('output/market-verification.json', JSON.stringify({ platform: process.platform + '-' + process.arch, hostVersion, hostRunId: process.env.QINGZUO_HOST_RUN_ID, hostSha256: digest, pluginVersion: marketPlugin.version, source: 'signed public market', hostUnchanged: true, paidRequests: 0 }, null, 2));
   console.log('Signed public AI-image market installation passed; pinned host unchanged; no image requests.');
 } finally {
   await app?.close();
