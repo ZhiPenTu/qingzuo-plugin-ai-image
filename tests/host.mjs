@@ -146,7 +146,7 @@ try {
   host.plugin = host.app.context().pages().find(page => page.url().startsWith('commerce-plugin://official.ai-image/'));
   await host.plugin.locator('#history').selectOption(draft.id); await expect(host.plugin.locator('#batch-status')).toContainText('4 / 4');
   await host.plugin.getByRole('button', { name: '对比预览' }).first().click(); await expect(host.plugin.locator('#result')).toBeVisible();
-  expect(await host.plugin.locator('#result').evaluate(image => image.complete && image.naturalWidth === 1)).toBe(true);
+  await expect.poll(() => host.plugin.locator('#result').evaluate(image => image.complete && image.naturalWidth === 1)).toBe(true);
   await host.plugin.screenshot({ path: 'output/preview-completed.png' });
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#pick').click(); await host.plugin.locator('#provider').selectOption('openai');
   await host.plugin.locator('#prompt').fill('保留商品，柔和光线'); await host.plugin.locator('#trial').click();
@@ -213,7 +213,7 @@ try {
   await expect.poll(async () => (await readdir(output)).length).toBe(14);
   await host.plugin.getByRole('button', { name: '查看结果' }).first().click();
   await expect(host.plugin.locator('#comparison')).toBeVisible(); await expect(host.plugin.locator('#original-figure')).toBeHidden();
-  expect(await host.plugin.locator('#result').evaluate(image => image.complete && image.naturalWidth === 1)).toBe(true);
+  await expect.poll(() => host.plugin.locator('#result').evaluate(image => image.complete && image.naturalWidth === 1)).toBe(true);
   await host.plugin.screenshot({ path: path.join(evidence, '文生图批量结果.png') });
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#provider').selectOption('openai'); await host.plugin.locator('#trial').click();
   await host.plugin.locator('#execute').click();
