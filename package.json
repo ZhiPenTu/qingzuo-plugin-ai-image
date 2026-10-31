@@ -1,17 +1,17 @@
 {
   "name": "@commerce/plugin-ai-image",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "commerce": {
     "manifestVersion": 1,
     "id": "official.ai-image",
     "title": "AI 批图",
-    "description": "使用轻作共享 AI 图像能力批量编辑图片，支持自定义提示词与多模型批处理",
+    "description": "使用轻作共享 AI 图像能力批量生成或编辑图片，支持自定义提示词与多模型批处理",
     "category": "图片处理",
-    "api": "^1.2.0",
+    "api": "^1.6.0",
     "ui": "ui/index.html",
-    "releaseNotes": "重新设计批量图片工作台，收紧间距与圆角，编辑方案和图片队列并列展示，支持深色与窄屏。",
+    "releaseNotes": "新增文生图模式，并保留图生图批量处理；支持逐项提示词、逐张保存与结果预览，不再保存提示词模板。",
     "permissions": {
       "files": true,
       "ai": [
@@ -27,7 +27,7 @@
     "test:market": "node tests/market.mjs"
   },
   "dependencies": {
-    "@commerce/plugin-sdk": "file:vendor/commerce-plugin-sdk-1.2.0.tgz"
+    "@commerce/plugin-sdk": "file:vendor/commerce-plugin-sdk-1.6.0.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0"

@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const executablePath = process.env.QINGZUO_HOST_EXECUTABLE;
 if (!executablePath) throw new Error('指定固定底座 QINGZUO_HOST_EXECUTABLE。');
-const hostVersion = process.env.QINGZUO_HOST_VERSION || '0.6.6';
+const hostVersion = process.env.QINGZUO_HOST_VERSION || '0.6.12';
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'qingzuo-market-ai-'));
 const applicationRoot = process.platform === 'darwin' ? path.resolve(executablePath, '../../..') : path.dirname(executablePath);
 const archive = path.join(applicationRoot, process.platform === 'darwin' ? 'Contents/Resources/app.asar' : 'resources/app.asar');
@@ -37,7 +37,12 @@ try {
   await expect.poll(() => app.context().pages().some(candidate => candidate.url().startsWith('commerce-plugin://official.ai-image/'))).toBe(true);
   const plugin = app.context().pages().find(candidate => candidate.url().startsWith('commerce-plugin://official.ai-image/'));
   await expect(plugin.locator('#source')).toHaveValue('proxy');
+  await expect(plugin.locator('#mode-edit')).toHaveAttribute('aria-selected', 'true');
   await expect(plugin.locator('#count')).toHaveText('0');
+  await plugin.locator('#mode-generate').click();
+  await expect(plugin.locator('#mode-generate')).toHaveAttribute('aria-selected', 'true');
+  await expect(plugin.locator('#count')).toHaveText('4');
+  await expect(plugin.locator('#templates, #save-template, #delete-template')).toHaveCount(0);
   expect(createHash('sha256').update(await readFile(archive)).digest('hex')).toBe(digest);
   await mkdir('output', { recursive: true });
   await plugin.screenshot({ path: 'output/market-installed.png' });

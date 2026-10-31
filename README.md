@@ -1,14 +1,14 @@
 # AI 批图
 
-轻作独立插件 `official.ai-image`，版本 0.1.5，需要支持共享图像能力的轻作 / 插件 API 1.2。
+轻作独立插件 `official.ai-image`，版本 0.2.0，需要支持共享图像能力的轻作 / 插件 API 1.6。
 
-导入 `release/official.ai-image-0.1.5-darwin-arm64.ecplugin` 后，服务连接统一在轻作「AI 设置」中完成。插件可选择「共享连接」使用兼容服务，或选择「共享官方 API」使用底座配置的 Google / OpenAI 图像服务；插件不保存服务商密钥，也不直接访问图像 API。旧版插件保存的密钥会在首次使用时兼容迁移。对话与方案规划统一使用轻作底座「AI 对话」，插件本身不内置对话 AI。
+导入 `release/official.ai-image-0.2.0-darwin-arm64.ecplugin` 后，服务连接统一在轻作「AI 设置」中完成。插件可选择「共享连接」使用兼容服务，或选择「共享官方 API」使用底座配置的 Google / OpenAI 图像服务；插件不保存服务商密钥，也不直接访问图像 API。旧版插件保存的密钥会在首次使用时兼容迁移。对话与方案规划统一使用轻作底座「AI 对话」，插件本身不内置对话 AI。
 
-批量选择 PNG、JPEG、WebP，设置统一提示词及逐图覆盖，点击准备方案；确认方案和输出目录后执行。可先单图试运行。关闭插件仍继续处理，退出应用停止请求。已保存结果保留；恢复时重新授权输出目录，状态未知的请求不会自动重发。保存失败保留图片并可重新保存。
+「文生图」无需导入原图，设置生成数量和统一提示词即可批量生成，也可以逐项改写提示词；「图生图」批量选择 PNG、JPEG、WebP，设置统一提示词及逐图覆盖。两种模式都先准备方案，确认模型、来源和输出目录后执行，可先试一张。关闭插件仍继续处理，退出应用停止请求。已保存结果保留；恢复时重新授权输出目录，状态未知的请求不会自动重发。保存失败保留图片并可重新保存。不再保存方案模板。
 
-`npm ci --ignore-scripts && npm test && npm run pack` 构建插件。SDK 1.2.0 的固定 tarball 随项目保存，发布时对照 SDK Release 的 SHA-256 验证，运行插件无需 Node/npm。
+`npm ci --ignore-scripts && npm test && npm run pack` 构建插件。SDK 1.6.0 的固定 tarball 随项目保存，发布时对照 SDK Release 的 SHA-256 验证，运行插件无需 Node/npm。
 
-共享连接的目录按真实 `/v1/models` 返回发现 GPT Image、Gemini / Nano Banana 和 `type: openai-image` 的兼容别名，不硬编码服务中不存在的型号。GPT Image 使用 `/v1/images/edits`，Gemini 使用 `/v1beta/models/{id}:generateContent`；兼容模型需要在服务端配置 `image: true`。目录存在不代表账户有编辑权限，服务拒绝时显示错误，不换型号、不自动重试。只接受内联图片结果，URL-only 响应不进行额外下载。轻作不重发生成；共享服务自身的重试和额度策略由用户配置管理。
+共享连接的目录按真实 `/v1/models` 返回发现 GPT Image、Gemini / Nano Banana 和 `type: openai-image` 的兼容别名，不硬编码服务中不存在的型号。图生图使用 GPT Image 的 `/v1/images/edits` 或 Gemini 的 `/v1beta/models/{id}:generateContent`；文生图使用 `/v1/images/generations` 或只带文字 part 的 Gemini `generateContent`。兼容模型需要在服务端配置 `image: true`。目录存在不代表账户有生成或编辑权限，服务拒绝时显示错误，不换型号、不自动重试。只接受内联图片结果，URL-only 响应不进行额外下载。轻作不重发生成；共享服务自身的重试和额度策略由用户配置管理。
 
 # 配置入口
 
@@ -16,7 +16,7 @@
 
 ## 发布与验收
 
-标签 `v0.1.5` 触发 macOS arm64 / Windows x64 独立构建。仓库变量 `QINGZUO_HOST_RUN_ID` 指向轻作 v0.6.6 成功的正式发布构建，发布脚本核对其提交与正式标签后下载固定制品，在源码目录外运行插件黄金路径。自动化只使用固定响应，包含官方 / 代理图片编辑、11 张结果保存，不产生付费请求。
+标签 `v0.2.0` 触发 macOS arm64 / Windows x64 独立构建。仓库变量 `QINGZUO_HOST_RUN_ID` 指向轻作 v0.6.12 成功的正式发布构建，发布脚本核对其提交与正式标签后下载固定制品，在源码目录外运行插件黄金路径。自动化只使用固定响应，包含官方 / 代理的文生图与图生图批量保存，不产生付费请求。
 
 插件 Release 发布后由 `ZhiPenTu/qingzuo-market` 验证原始制品 SHA-256、清单和发布者，使用既有 Ed25519 密钥签名，再经目录 PR 上架。图像模型存在不代表实际账户具备权限；真实账户图像效果、费用 / 额度及 OAuth 全流程仍需用户验收。
 

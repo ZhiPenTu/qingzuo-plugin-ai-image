@@ -16,7 +16,7 @@ const imageCatalog = [{ id: 'gemini-3.1-flash-image-preview', type: 'gemini' }, 
 let proxyCatalog = imageCatalog;
 const server = createServer(async (request, response) => {
   if (request.url === '/v1/models') { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ data: proxyCatalog })); return; }
-  if (request.url === '/v1/images/edits' || request.url.startsWith('/v1beta/models/')) {
+  if (request.url === '/v1/images/edits' || request.url === '/v1/images/generations' || request.url.startsWith('/v1beta/models/')) {
     try {
       expect(request.headers.authorization).toBe('Bearer fixture-text');
       const chunks = []; for await (const chunk of request) chunks.push(chunk);
@@ -26,11 +26,18 @@ const server = createServer(async (request, response) => {
         expect(form.get('n')).toBe('1'); expect(form.get('response_format')).toBe('b64_json'); expect(form.getAll('image[]')).toHaveLength(1);
         expect(Buffer.from(await form.get('image[]').arrayBuffer())).toEqual(png);
         proxyCalls.push({ endpoint: request.url, model: form.get('model') });
+      } else if (request.url === '/v1/images/generations') {
+        const body = JSON.parse(bytes);
+        expect(body.n).toBe(1); expect(body.response_format).toBe('b64_json'); expect(body.prompt).toBeTruthy();
+        proxyCalls.push({ endpoint: request.url, model: body.model });
       } else {
-        const body = JSON.parse(bytes); expect(body.contents[0].parts).toHaveLength(2); expect(body.contents[0].parts[1].inline_data.data).toBe(png.toString('base64'));
+        const body = JSON.parse(bytes), images = body.contents[0].parts.filter(part => part.inline_data);
+        expect([1, 2]).toContain(body.contents[0].parts.length);
+        if (body.contents[0].parts.length === 2) expect(images[0].inline_data.data).toBe(png.toString('base64'));
+        else expect(body.contents[0].parts[0].text).toBeTruthy();
         proxyCalls.push({ endpoint: request.url });
       }
-      response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify(request.url === '/v1/images/edits' ? { data: [{ b64_json: png.toString('base64') }] } : { candidates: [{ content: { parts: [{ inline_data: { data: png.toString('base64') } }] } }] }));
+      response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify(['/v1/images/edits', '/v1/images/generations'].includes(request.url) ? { data: [{ b64_json: png.toString('base64') }] } : { candidates: [{ content: { parts: [{ inline_data: { data: png.toString('base64') } }] } }] }));
     } catch (error) { console.error(error); response.writeHead(400); response.end(); }
     return;
   }
@@ -57,8 +64,14 @@ async function trusted(work, args) {
         globalThis.qingzuoImageCalls.push(url);
         if (url.includes('googleapis')) {
           if (options.headers['x-goog-api-key'] !== 'fixture-google') throw new Error('Google credential contract');
-          const body = JSON.parse(options.body); if (body.contents[0].parts.filter(part => part.inline_data).length !== 1) throw new Error('One image required');
-        } else if (url !== 'https://api.openai.com/v1/images/edits' || options.headers.Authorization !== 'Bearer fixture-openai' || options.body.get('n') !== '1') throw new Error('OpenAI contract');
+          const body = JSON.parse(options.body), parts = body.contents[0].parts, images = parts.filter(part => part.inline_data);
+          if (parts.length === 2 ? images.length !== 1 : parts.length !== 1 || !parts[0].text) throw new Error('Google image request contract');
+        } else if (url === 'https://api.openai.com/v1/images/edits') {
+          if (options.headers.Authorization !== 'Bearer fixture-openai' || options.body.get('n') !== '1') throw new Error('OpenAI edit contract');
+        } else if (url === 'https://api.openai.com/v1/images/generations') {
+          const body = JSON.parse(options.body);
+          if (options.headers.Authorization !== 'Bearer fixture-openai' || body.n !== 1 || !body.prompt) throw new Error('OpenAI generation contract');
+        } else throw new Error('Unexpected official image endpoint');
         await new Promise((resolve, reject) => { const timer = setTimeout(resolve, 400); options.signal.addEventListener('abort', () => { clearTimeout(timer); reject(options.signal.reason); }, { once: true }); });
         return Response.json(url.includes('googleapis') ? { candidates: [{ content: { parts: [{ inlineData: { data: input.args.png } }] } }] } : { data: [{ b64_json: input.args.png }] });
       };
@@ -91,6 +104,8 @@ try {
   expect(await host.plugin.evaluate(() => window.commercePlugin.invoke('credentials.status', { name: 'google-image' }).then(() => null, error => error.message))).toMatch(/未授权/);
   expect(await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.configureImage', { provider: 'google', apiKey: 'hidden' }).then(() => null, error => error.message))).toMatch(/无效/);
   await expect(host.plugin.locator('#open-api-settings')).toHaveCount(0);
+  await expect(host.plugin.locator('#templates, #save-template, #delete-template')).toHaveCount(0);
+  expect(await host.plugin.evaluate(() => localStorage.getItem('prompt-templates'))).toBeNull();
   await expect(host.plugin.locator('#source')).toHaveValue('proxy');
   if (process.env.QINGZUO_UI_EVIDENCE_DIR) {
     await mkdir(process.env.QINGZUO_UI_EVIDENCE_DIR, { recursive: true });
@@ -178,8 +193,42 @@ try {
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#provider').selectOption('openai');
   await host.plugin.evaluate(() => window.scrollTo(0, 0));
   await host.plugin.screenshot({ path: path.join(evidence, '共享连接图片模型.png') });
+  await host.plugin.locator('#mode-generate').click();
+  await expect(host.plugin.locator('#mode-generate')).toHaveAttribute('aria-selected', 'true');
+  await expect(host.plugin.locator('#pick')).toBeHidden();
+  await expect(host.plugin.locator('#count')).toHaveText('4');
+  await host.plugin.locator('#generate-count').fill('3'); await host.plugin.locator('#generate-count').dispatchEvent('change');
+  await expect(host.plugin.locator('#count')).toHaveText('3');
+  await trusted('configure-shared', { google: 'fixture-google', openai: 'fixture-openai' });
+  await host.plugin.locator('#source').selectOption('official'); await host.plugin.locator('#provider').selectOption('google');
+  await host.plugin.locator('#refresh-service').click();
+  await host.plugin.locator('#prompt').fill('一只戴红色围巾的柴犬站在雪地里，清晨柔光，真实摄影');
+  await host.plugin.getByLabel('生成图-2 提示词', { exact: true }).fill('同一只柴犬，改为傍晚暖光');
+  await host.plugin.locator('#prepare').click(); await expect(host.plugin.locator('#batch-actions')).toBeVisible();
+  const generationDraft = (await host.plugin.evaluate(() => window.commercePlugin.invoke('ai.batch.list'))).find(batch => batch.mode === 'generate');
+  expect(generationDraft.mode).toBe('generate'); expect(generationDraft.items).toHaveLength(3);
+  expect(generationDraft.items.every(item => !Object.hasOwn(item, 'token'))).toBe(true);
+  expect(generationDraft.items[1].prompt).toBe('同一只柴犬，改为傍晚暖光');
+  await host.plugin.evaluate(() => { window.confirm = () => true; }); await host.plugin.locator('#execute').click();
+  await expect.poll(async () => (await readdir(output)).length).toBe(14);
+  await host.plugin.getByRole('button', { name: '查看结果' }).first().click();
+  await expect(host.plugin.locator('#comparison')).toBeVisible(); await expect(host.plugin.locator('#original-figure')).toBeHidden();
+  expect(await host.plugin.locator('#result').evaluate(image => image.complete && image.naturalWidth === 1)).toBe(true);
+  await host.plugin.screenshot({ path: path.join(evidence, '文生图批量结果.png') });
+  await host.plugin.locator('#clear').click(); await host.plugin.locator('#provider').selectOption('openai'); await host.plugin.locator('#trial').click();
+  await host.plugin.locator('#execute').click();
+  await expect.poll(async () => (await readdir(output)).length).toBe(15);
+  expect((await trusted('calls')).at(-1)).toBe('https://api.openai.com/v1/images/generations');
+  await host.plugin.locator('#clear').click(); await host.plugin.locator('#source').selectOption('proxy');
+  await expect(host.plugin.locator('#proxy-state')).toContainText('3 个图片模型');
+  await host.plugin.locator('#provider').selectOption('google');
+  await host.plugin.locator('#generate-count').fill('2'); await host.plugin.locator('#generate-count').dispatchEvent('change');
+  await host.plugin.locator('#prompt').fill('透明玻璃质感的产品展示，浅灰背景');
+  await host.plugin.locator('#prepare').click(); await host.plugin.locator('#execute').click();
+  await expect.poll(async () => (await readdir(output)).length).toBe(17);
+  expect(proxyCalls).toHaveLength(8); expect(proxyCalls.at(-1).endpoint).toContain('/v1beta/models/gemini-3.1-flash-image-preview:generateContent');
   expect(pageErrors).toEqual([]);
-  console.log('独立安装包验收通过：底座共享官方与共享连接、旧插件无密钥权限、多图保存、模型刷新保留队列、批次来源冻结、确认隔离、默认助手不变；无付费请求。');
+  console.log('独立安装包验收通过：底座共享官方与共享连接、图生图与文生图批量保存、模型刷新保留队列、批次来源冻结、确认隔离、无模板保存；无付费请求。');
 } catch (error) {
   const notice = await host.plugin.locator('#notice').textContent().catch(() => '[plugin page closed]');
   const diagnostic = await trusted('diagnostic').catch(() => '[runtime unavailable]');
