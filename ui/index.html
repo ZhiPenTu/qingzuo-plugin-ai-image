@@ -1,23 +1,115 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI 批图 · 轻作</title><link rel="stylesheet" href="style.css"></head><body>
-<main>
-  <header class="hero"><div><p class="eyebrow">QINGZUO · IMAGE STUDIO</p><h1>一份灵感，整批出图。</h1><p>把重复的修图交给 AI，让每一张都贴近你的想法。</p></div><div class="service-entry"><button id="refresh-service" class="secondary">刷新图像服务</button><span id="image-service-state">读取服务状态…</span></div></header>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI 批图 · 轻作</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="tool-page">
+  <header class="page-head">
+    <div>
+      <h1>AI 批图</h1>
+      <p>统一编辑一整组图片，逐张确认提示词后再执行。</p>
+    </div>
+    <div class="service-entry">
+      <span id="image-service-state">读取服务状态…</span>
+      <button id="refresh-service" class="secondary" type="button">刷新图像服务</button>
+    </div>
+  </header>
+
   <div id="notice" role="status" aria-live="polite" hidden></div>
-  <section id="setup-notice" class="setup-notice" hidden><div><strong>先连接共享图像服务，再开始批图</strong><p id="setup-description">请在轻作「AI 设置」中完成图像服务配置。</p></div><button id="setup-refresh">刷新图像服务</button></section>
-  <div class="layout">
-    <section class="workbench">
-      <div class="panel"><div class="section-heading"><div><h2>编辑方案</h2><p>选择模型，写下想要的变化。</p></div><button id="pick">＋ 批量导入</button></div>
-        <div class="form-grid"><label>图像来源<select id="source"><option value="proxy">共享连接 · 兼容服务</option><option value="official">共享官方 API</option></select></label><label>模型系列<select id="provider"><option value="google">Nano Banana / Gemini</option><option value="openai">GPT Image</option><option value="compatible">兼容图片模型</option></select></label><label>型号<select id="model"></select></label><label id="size-label">尺寸<select id="size"></select></label><label id="ratio-label">比例<select id="ratio"></select></label><label id="quality-label" hidden>质量<select id="quality"></select></label><label>并发数量<select id="concurrency"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label></div>
-        <div id="proxy-controls" class="template-bar"><button id="refresh-models" class="secondary">刷新兼容图片模型</button><span id="proxy-state" role="status">正在读取兼容服务模型…</span></div><p id="model-hint" class="hint">访问密钥由轻作统一管理，图片确认后才上传。仅刷新列表不会生成图片。</p>
-        <label>统一提示词<textarea id="prompt" rows="4" placeholder="例如：保留商品形状、颜色和文字，改成自然光下的浅色背景，增加柔和阴影。"></textarea></label>
-        <div class="template-bar"><select id="templates" aria-label="提示词模板"><option value="">选择模板</option></select><button id="save-template" class="secondary">保存当前模板</button><button id="delete-template" class="quiet">删除模板</button></div>
-        <div class="actions"><button id="prepare" disabled>准备批量方案</button><button id="trial" class="secondary" disabled>先试一张</button><button id="clear" class="quiet">新建批次</button></div>
+  <section id="setup-notice" class="setup-notice" hidden>
+    <div>
+      <strong>先连接共享图像服务，再开始批图</strong>
+      <p id="setup-description">请在轻作「AI 设置」中完成图像服务配置。</p>
+    </div>
+    <button id="setup-refresh" type="button">刷新图像服务</button>
+  </section>
+
+  <div class="workspace-grid">
+    <section class="card composer">
+      <div class="section-head">
+        <div>
+          <h2>编辑方案</h2>
+          <p>选择模型并写下这一组图片的统一要求。</p>
+        </div>
+        <button id="pick" type="button">批量导入</button>
       </div>
-      <div class="panel"><div class="section-heading"><div><h2>图片队列 <span id="count">0</span></h2><p id="summary">导入原图后，可以为每张图片单独设置提示词。</p></div><select id="history" aria-label="历史批次"><option value="">当前选择</option></select></div><div id="queue" class="queue"><div class="empty"><span>✧</span><h3>从一张图片开始</h3><p>PNG、JPEG、WebP · 单张不超过 25 MB</p></div></div>
-        <div id="batch-actions" hidden><div class="progress"><div id="progress-bar"></div></div><p id="batch-status"></p><div class="actions"><button id="execute">确认方案并执行</button><button id="cancel" class="secondary">停止批次</button><button id="retry" class="secondary">重试失败项 / 重新保存</button></div><p class="hint">完成一张，保存一张。关闭工具后仍在后台执行，退出轻作后可手动恢复。</p></div>
+
+      <div class="form-grid">
+        <label>图像来源<select id="source"><option value="proxy">共享连接 · 兼容服务</option><option value="official">共享官方 API</option></select></label>
+        <label>模型系列<select id="provider"><option value="google">Nano Banana / Gemini</option><option value="openai">GPT Image</option><option value="compatible">兼容图片模型</option></select></label>
+        <label>型号<select id="model"></select></label>
+        <label id="size-label">尺寸<select id="size"></select></label>
+        <label id="ratio-label">比例<select id="ratio"></select></label>
+        <label id="quality-label" hidden>质量<select id="quality"></select></label>
+        <label>并发数量<select id="concurrency"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
       </div>
-      <div id="comparison" class="panel" hidden><div class="section-heading"><h2>原图与结果</h2><button id="close-preview" class="quiet">关闭预览</button></div><div class="compare"><figure><figcaption>原图</figcaption><img id="original" alt="原始图片"></figure><figure><figcaption>编辑结果</figcaption><img id="result" alt="编辑后的图片"></figure></div></div>
+
+      <div id="proxy-controls" class="inline-note">
+        <button id="refresh-models" class="secondary" type="button">刷新兼容图片模型</button>
+        <span id="proxy-state" role="status">正在读取兼容服务模型…</span>
+      </div>
+      <p id="model-hint" class="hint">访问密钥由轻作统一管理，图片确认后才上传。</p>
+
+      <label for="prompt">统一提示词</label>
+      <textarea id="prompt" rows="4" placeholder="例如：保留商品形状、颜色和文字，改成自然光下的浅色背景，增加柔和阴影。"></textarea>
+      <div class="template-bar">
+        <select id="templates" aria-label="提示词模板"><option value="">选择模板</option></select>
+        <button id="save-template" class="secondary" type="button">保存模板</button>
+        <button id="delete-template" class="quiet" type="button">删除</button>
+      </div>
+      <div class="actions">
+        <button id="prepare" type="button" disabled>准备批量方案</button>
+        <button id="trial" class="secondary" type="button" disabled>先试一张</button>
+        <button id="clear" class="quiet" type="button">新建批次</button>
+      </div>
     </section>
 
+    <section class="card queue-panel">
+      <div class="section-head queue-head">
+        <div>
+          <h2>图片队列 <span id="count" class="count">0</span></h2>
+          <p id="summary">导入原图后，可以为每张图片单独设置提示词。</p>
+        </div>
+        <select id="history" aria-label="历史批次"><option value="">当前选择</option></select>
+      </div>
+      <div id="queue" class="queue">
+        <div class="empty">
+          <span aria-hidden="true">＋</span>
+          <strong>从一张图片开始</strong>
+          <p>PNG、JPEG、WebP · 单张不超过 25 MB</p>
+        </div>
+      </div>
+      <div id="batch-actions" hidden>
+        <div class="progress"><div id="progress-bar"></div></div>
+        <p id="batch-status"></p>
+        <div class="actions">
+          <button id="execute" type="button">确认方案并执行</button>
+          <button id="cancel" class="secondary" type="button">停止批次</button>
+          <button id="retry" class="secondary" type="button">重试失败项 / 重新保存</button>
+        </div>
+        <p class="hint">完成一张，保存一张。关闭工具后仍会在后台执行。</p>
+      </div>
+    </section>
+
+    <section id="comparison" class="card comparison" hidden>
+      <div class="section-head">
+        <div>
+          <h2>原图与结果</h2>
+          <p>对比本次编辑前后的画面。</p>
+        </div>
+        <button id="close-preview" class="quiet" type="button">关闭预览</button>
+      </div>
+      <div class="compare">
+        <figure><figcaption>原图</figcaption><img id="original" alt="原始图片"></figure>
+        <figure><figcaption>编辑结果</figcaption><img id="result" alt="编辑后的图片"></figure>
+      </div>
+    </section>
   </div>
-</main><script type="module" src="app.mjs"></script></body></html>
+</main>
+<script type="module" src="app.mjs"></script>
+</body>
+</html>
