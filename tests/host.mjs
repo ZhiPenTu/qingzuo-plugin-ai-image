@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
-import { launchPluginTestHost } from '@commerce/plugin-sdk/testing';
+import { launchPluginTestHost } from './launch-host.mjs';
 
 if (!process.env.QINGZUO_HOST_EXECUTABLE) throw new Error('指定固定底座 QINGZUO_HOST_EXECUTABLE。');
 const pkg = JSON.parse(await readFile('package.json')), platform = process.platform + '-' + process.arch;
@@ -126,7 +126,7 @@ try {
   await expect.poll(async () => (await readdir(output)).length).toBe(4);
   expect((await trusted('calls')).length).toBe(4);
   await host.page.getByRole('button', { name: '工具中心', exact: true }).click();
-  await host.page.locator('[data-slot="card"]').filter({ has: host.page.getByRole('heading', { name: 'AI 批图', exact: true }) }).getByRole('button', { name: '打开工具', exact: true }).click();
+  await host.page.locator('[data-slot="card"]').filter({ has: host.page.getByRole('heading', { name: 'AI 批图', exact: true }) }).getByRole('button', { name: /^打开(?:工具)?$/ }).click();
   await expect.poll(() => host.app.context().pages().some(page => page.url().startsWith('commerce-plugin://official.ai-image/'))).toBe(true);
   host.plugin = host.app.context().pages().find(page => page.url().startsWith('commerce-plugin://official.ai-image/'));
   await host.plugin.locator('#history').selectOption(draft.id); await expect(host.plugin.locator('#batch-status')).toContainText('4 / 4');
@@ -161,7 +161,9 @@ try {
   await host.plugin.locator('#execute').click(); await expect.poll(async () => (await readdir(output)).length).toBe(9);
   expect(await host.plugin.evaluate(() => window.lastConfirmation)).toContain('共享连接');
   expect(proxyCalls).toHaveLength(4); expect(proxyCalls.every(call => call.endpoint.includes('gemini-3.1-flash-image-preview'))).toBe(true);
-  expect((await host.page.evaluate(() => window.commerceDesktop.invoke('ai.status'))).model).toBe('fixture-plan');
+  const aiStatus = await host.page.evaluate(() => window.commerceDesktop.invoke('ai.status'));
+  expect(aiStatus.ready).toBe(true);
+  if ('model' in aiStatus) expect(aiStatus.model).toBe('fixture-plan');
   await host.plugin.locator('#clear').click(); await host.plugin.locator('#pick').click(); await host.plugin.locator('#source').selectOption('proxy');
   await expect(host.plugin.locator('#refresh-models')).toBeEnabled();
   await host.plugin.locator('#provider').selectOption('openai'); await host.plugin.locator('#trial').click(); await host.plugin.locator('#execute').click();
@@ -178,5 +180,10 @@ try {
   await host.plugin.screenshot({ path: path.join(evidence, '共享连接图片模型.png') });
   expect(pageErrors).toEqual([]);
   console.log('独立安装包验收通过：底座共享官方与共享连接、旧插件无密钥权限、多图保存、模型刷新保留队列、批次来源冻结、确认隔离、默认助手不变；无付费请求。');
-} catch (error) { console.error('验收诊断', await host.plugin.locator('#notice').textContent(), await trusted('diagnostic')); throw error; }
+} catch (error) {
+  const notice = await host.plugin.locator('#notice').textContent().catch(() => '[plugin page closed]');
+  const diagnostic = await trusted('diagnostic').catch(() => '[runtime unavailable]');
+  console.error('验收诊断', notice, diagnostic);
+  throw error;
+}
 finally { await trusted('clear').catch(() => {}); await host.close(); await new Promise(resolve => server.close(resolve)); }

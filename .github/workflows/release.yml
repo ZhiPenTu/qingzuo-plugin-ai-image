@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       host_run_id:
-        description: 'Successful Qingzuo v0.6.6 Release commerce desktop run ID'
+        description: 'Successful Qingzuo v0.6.11 Release commerce desktop run ID'
         required: true
         type: string
       validation:
@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       QINGZUO_HOST_RUN_ID: ${{ inputs.host_run_id || vars.QINGZUO_HOST_RUN_ID }}
-      QINGZUO_HOST_VERSION: v0.6.6
+      QINGZUO_HOST_VERSION: v0.6.11
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
